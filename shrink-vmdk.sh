@@ -96,7 +96,7 @@ for PARTITION_NUM in $(vmware-mount -p "${VMDK_FILE}" | egrep 'GPT EE Basic Data
   vmware-mount "${VMDK_FILE}" ${PARTITION_NUM} "${MOUNT_POINT_VOL}"
   if [ $? -eq 0 ]; then
 #    Uncomment the following line if you want to access the partitions one by one
-#    read -rsp "Mounted partition ${PARTITION_NUM} on ${MOUNT_POINT_VOL}   Press [Enter] key to continue"
+#    read -p "Mounted partition ${PARTITION_NUM} on ${MOUNT_POINT_VOL}   Press [Enter] key to continue "
     vmware-vdiskmanager -p "${MOUNT_POINT_VOL}"
     vmware-mount -d "${MOUNT_POINT_VOL}"
     PERFORM_SHRINKING='true'
@@ -125,7 +125,7 @@ if [ -n "${LVM_PARTITIONS}" ]; then
             echo "${BASENAME_SCRIPT}: Preparing for shrinking: ${MAPPED_DEV}"
             mount ${MAPPED_DEV} "${MOUNT_POINT_VOL}"
 #            Uncomment the following line if you want to access the logical volumes one by one
-#            read -rsp "Mounted $(basename ${MAPPED_DEV}) on ${MOUNT_POINT_VOL}   Press [Enter] key to continue"
+#            read -p "Mounted $(basename ${MAPPED_DEV}) on ${MOUNT_POINT_VOL}   Press [Enter] key to continue "
             vmware-vdiskmanager -p "${MOUNT_POINT_VOL}"
             umount "${MOUNT_POINT_VOL}"
             PERFORM_SHRINKING='true'
