@@ -17,6 +17,8 @@
 # Limitations:
 # - Linux host and VMDK cannot have a volume group with the same name.
 # - Not tested with paths and file names containing spaces.
+# - Shrinking works for disks split into 2GB files, but the root user
+#   owns the files afterwards.
 #
 # This software comes with absolutely no warranty. Use at your own risk.
 
