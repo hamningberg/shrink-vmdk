@@ -16,7 +16,6 @@
 #
 # Limitations:
 # - Linux host and VMDK cannot have a volume group with the same name.
-# - Not tested with paths and file names containing spaces.
 # - Shrinking works for disks split into 2GB files, but the root user
 #   owns the files afterwards.
 #
@@ -26,6 +25,8 @@ BASENAME_SCRIPT=$(basename "$0")
 
 cleanup() {
   EXIT_STATUS=$?
+
+  echo "${BASENAME_SCRIPT}: Cleaning up"
 
   mountpoint --quiet "${MOUNT_POINT_VOL}"
   if [ $? -eq 0 ]; then
@@ -94,7 +95,7 @@ MOUNT_POINT_IMAGE=$(mktemp -d -t "${BASENAME_SCRIPT}"-flat.XXXXXXXXXX)
 MOUNT_POINT_VOL=$(mktemp -d -t "${BASENAME_SCRIPT}"-vol.XXXXXXXXXX)
 
 for PARTITION_NUM in $(vmware-mount -p "${VMDK_FILE}" | egrep 'GPT EE Basic Data$|BIOS 83 Linux$' | cut -c-2); do
-  echo "${BASENAME_SCRIPT}: Preparing for shrinking: Partition ${PARTITION_NUM} of $(basename ${VMDK_FILE})"
+  echo "${BASENAME_SCRIPT}: Preparing for shrinking: Partition ${PARTITION_NUM} of $(basename "${VMDK_FILE}")"
   vmware-mount "${VMDK_FILE}" ${PARTITION_NUM} "${MOUNT_POINT_VOL}"
   if [ $? -eq 0 ]; then
 #    Uncomment the following line if you want to access the partitions one by one
@@ -105,7 +106,7 @@ for PARTITION_NUM in $(vmware-mount -p "${VMDK_FILE}" | egrep 'GPT EE Basic Data
   fi
 done
 
-LVM_PARTITIONS="$(vmware-mount -p ${VMDK_FILE} | egrep 'GPT EE Linux Lvm$|BIOS 8E Unknown$')"
+LVM_PARTITIONS="$(vmware-mount -p "${VMDK_FILE}" | egrep 'GPT EE Linux Lvm$|BIOS 8E Unknown$')"
 
 if [ -n "${LVM_PARTITIONS}" ]; then
   vmware-mount -f "${VMDK_FILE}" "${MOUNT_POINT_IMAGE}"
@@ -127,7 +128,7 @@ if [ -n "${LVM_PARTITIONS}" ]; then
             echo "${BASENAME_SCRIPT}: Preparing for shrinking: ${MAPPED_DEV}"
             mount ${MAPPED_DEV} "${MOUNT_POINT_VOL}"
 #            Uncomment the following line if you want to access the logical volumes one by one
-#            read -p "Mounted $(basename ${MAPPED_DEV}) on ${MOUNT_POINT_VOL}   Press [Enter] key to continue "
+#            read -p "Mounted $(basename "${MAPPED_DEV}") on ${MOUNT_POINT_VOL}   Press [Enter] key to continue "
             vmware-vdiskmanager -p "${MOUNT_POINT_VOL}"
             umount "${MOUNT_POINT_VOL}"
             PERFORM_SHRINKING='true'
