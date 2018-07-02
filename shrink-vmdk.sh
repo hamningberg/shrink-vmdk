@@ -138,6 +138,12 @@ if [ -n "${LVM_PARTITIONS}" ]; then
         VG_NAME=''
         losetup -d ${LOOP_DEVICE}
         LOOP_DEVICE=''
+        # It takes a few moments
+        MAPPED_DEV_STILL_HERE='yes'
+        while [ "${MAPPED_DEV_STILL_HERE}" ]; do
+          sleep 1
+          MAPPED_DEV_STILL_HERE=$(lvs --noheadings -o lv_dm_path 2>/dev/null | grep ${MAPPED_DEV})
+        done
       fi
     done
   fi
