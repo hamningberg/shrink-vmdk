@@ -26,42 +26,48 @@ BASENAME_SCRIPT=$(basename "$0")
 cleanup() {
   EXIT_STATUS=$?
 
-  echo "${BASENAME_SCRIPT}: Cleaning up"
+  if [ "${MOUNT_POINT_VOL}" -o "${MOUNT_POINT_IMAGE}" ]; then
+    echo "${BASENAME_SCRIPT}: Cleaning up"
 
-  mountpoint --quiet "${MOUNT_POINT_VOL}"
-  if [ $? -eq 0 ]; then
-    umount "${MOUNT_POINT_VOL}"
-  fi
+    if [ "${MOUNT_POINT_VOL}" ]; then
+      mountpoint --quiet "${MOUNT_POINT_VOL}"
+      if [ $? -eq 0 ]; then
+        umount "${MOUNT_POINT_VOL}"
+      fi
+      rmdir "${MOUNT_POINT_VOL}"
+    fi
 
-  if [ -n "${VG_NAME}" ]; then
-    vgchange -a n ${VG_NAME}
-  fi
+    if [ "${MOUNT_POINT_IMAGE}" ]; then
+      if [ -n "${VG_NAME}" ]; then
+        vgchange -a n ${VG_NAME}
+      fi
 
-  if [ -n "${LOOP_DEVICE}" ]; then
-    losetup -d ${LOOP_DEVICE}
-  fi
+      if [ -n "${LOOP_DEVICE}" ]; then
+        losetup -d ${LOOP_DEVICE}
+      fi
 
-  # If umounting fails, try the following to cleanup:
-  # dmsetup ls
-  # dmsetup remove /dev/mapper/logical-vol-1
-  # dmsetup remove /dev/mapper/logical-vol-2
-  mountpoint --quiet "${MOUNT_POINT_IMAGE}"
-  if [ $? -eq 0 ]; then
-    vmware-mount -k "${VMDK_FILE}"
-  fi
+      # If umounting fails, try the following to cleanup:
+      # dmsetup ls
+      # dmsetup remove /dev/mapper/logical-vol-1
+      # dmsetup remove /dev/mapper/logical-vol-2
+      mountpoint --quiet "${MOUNT_POINT_IMAGE}"
+      if [ $? -eq 0 ]; then
+        vmware-mount -k "${VMDK_FILE}"
+      fi
 
-  rmdir "${MOUNT_POINT_VOL}"
-  rmdir "${MOUNT_POINT_IMAGE}"
+      rmdir "${MOUNT_POINT_IMAGE}"
+    fi
 
-  if [ "${PERFORM_SHRINKING}" = 'true' ]; then
-    # Backup and restore ownership of the VMDK file because
-    # vmware-vdiskmanager changes it to the user and group
-    # that runs vmware-vdiskmanager.
-    # Do not use the %U:%G format for stat because it returns
-    # UNKNOWN:UNKNOWN if user and group are unknown.
-    VMDK_FILE_OWNER_GROUP=$(stat --format='%u:%g' "${VMDK_FILE}")
-    vmware-vdiskmanager -k "${VMDK_FILE}"
-    chown ${VMDK_FILE_OWNER_GROUP} "${VMDK_FILE}"
+    if [ "${PERFORM_SHRINKING}" = 'true' ]; then
+      # Backup and restore ownership of the VMDK file because
+      # vmware-vdiskmanager changes it to the user and group
+      # that runs vmware-vdiskmanager.
+      # Do not use the %U:%G format for stat because it returns
+      # UNKNOWN:UNKNOWN if user and group are unknown.
+      VMDK_FILE_OWNER_GROUP=$(stat --format='%u:%g' "${VMDK_FILE}")
+      vmware-vdiskmanager -k "${VMDK_FILE}"
+      chown ${VMDK_FILE_OWNER_GROUP} "${VMDK_FILE}"
+    fi
   fi
 
   trap '' EXIT INT QUIT TERM
@@ -91,11 +97,11 @@ fi
 trap cleanup EXIT
 trap cleanup_after_signal_caught INT QUIT TERM
 
-MOUNT_POINT_IMAGE=$(mktemp -d -t "${BASENAME_SCRIPT}"-flat.XXXXXXXXXX)
-MOUNT_POINT_VOL=$(mktemp -d -t "${BASENAME_SCRIPT}"-vol.XXXXXXXXXX)
-
-for PARTITION_NUM in $(vmware-mount -p "${VMDK_FILE}" | egrep 'GPT EE Basic Data$|BIOS 83 Linux$' | cut -c-2); do
+for PARTITION_NUM in $(vmware-mount -p "${VMDK_FILE}" | egrep 'GPT EE Basic Data$|BIOS 83 Linux$|BIOS  7 HPFS/NTFS' | cut -c-2); do
   echo "${BASENAME_SCRIPT}: Preparing for shrinking: Partition ${PARTITION_NUM} of $(basename "${VMDK_FILE}")"
+  if [ -z "${MOUNT_POINT_VOL}" ]; then
+    MOUNT_POINT_VOL=$(mktemp -d -t "${BASENAME_SCRIPT}"-vol.XXXXXXXXXX)
+  fi
   vmware-mount "${VMDK_FILE}" ${PARTITION_NUM} "${MOUNT_POINT_VOL}"
   if [ $? -eq 0 ]; then
 #    Uncomment the following line if you want to access the partitions one by one
@@ -109,9 +115,15 @@ done
 LVM_PARTITIONS="$(vmware-mount -p "${VMDK_FILE}" | egrep 'GPT EE Linux Lvm$|BIOS 8E Unknown$')"
 
 if [ -n "${LVM_PARTITIONS}" ]; then
+  if [ -z "${MOUNT_POINT_IMAGE}" ]; then
+    MOUNT_POINT_IMAGE=$(mktemp -d -t "${BASENAME_SCRIPT}"-flat.XXXXXXXXXX)
+  fi
   vmware-mount -f "${VMDK_FILE}" "${MOUNT_POINT_IMAGE}"
   if [ $? -eq 0 ]; then
     for VG_START_SECTOR in $(echo "${LVM_PARTITIONS}" | sed -r 's/^\s*[0-9]+\s+([0-9]+).+/\1/'); do
+      if [ -z "${MOUNT_POINT_VOL}" ]; then
+        MOUNT_POINT_VOL=$(mktemp -d -t "${BASENAME_SCRIPT}"-vol.XXXXXXXXXX)
+      fi
       VG_OFFSET=$((${VG_START_SECTOR} * 512))
       LOOP_DEVICE=$(losetup --find --show "${MOUNT_POINT_IMAGE}/flat" --offset ${VG_OFFSET})
       if [ -n "${LOOP_DEVICE}" ]; then
